@@ -5,7 +5,7 @@
 
 int cnt = 0;
 
-void boom(int s) 
+void tick(int sig) 
 { 
 	printf("Bonjour\n");
 	cnt++;
@@ -18,7 +18,7 @@ void boom(int s)
 
 int main()
 {
-	signal(SIGALRM, boom);  
+	signal(SIGALRM, tick);  
 
 	alarm(1);
 	while(1) {
