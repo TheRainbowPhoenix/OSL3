@@ -17,7 +17,7 @@ int main(int argc, char ** argv) {
 	else if (pid == 0) {
 		execvp(argv[1], cmd);
 		printf("Unknown command or invalid path : %s\n", argv[1]);
-		wait(NULL);
+		waitpid(pid, NULL, 0);
 	}
 
 	return 0;
