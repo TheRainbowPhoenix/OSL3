@@ -7,20 +7,18 @@
 
 int run = 1;
 int sw = 0;
-pid_t pid1;
-pid_t pid2;
+pid_t pid;
 
 void tac(int sig) {
-	printf("Sig %d !\n", getpid());
+	printf("Signal @%d !\n", getpid());
 }
 
 void tick(int sig) {
-	if(sw == 0) {
-			kill(pid1, SIGUSR1);
+	if(pid <= 0 || sw == 0) {
 			tac(0);
 			sw = 1;
 		} else {
-			kill(pid2, SIGUSR1);
+			kill(pid, SIGUSR1);
 			sw=0;
 		}
 		alarm(2);
@@ -28,18 +26,18 @@ void tick(int sig) {
 
 int main() {
 	
-	pid1 = fork();
-	pid2 = fork();
+	pid = fork();
 	
-	if (pid1 == -1 || pid2 == -1)
+	if (pid == -1)
 		perror("fork error");
-
-		signal(SIGUSR1, tac);
+	
+	if(pid>0) {
+		alarm(2);
 		signal(SIGALRM, tick); 
+	}
+	signal(SIGUSR1, tac);
 	
-	alarm(2);
-	
-	printf("pid %d %d\n", getppid(), getpid());
+	//printf("pid (%d) %d %d\n", pid, getppid(), getpid());
 	
 	while(run) {
 		pause();
