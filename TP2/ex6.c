@@ -85,37 +85,58 @@ int startsWith(char * p, char * s) {
 }
 
 char * _getENV(char *var) {
-  char * split;
-  while (*ENV) {
-    if(startsWith(var, *ENV)) {
-      char *split = strtok(*ENV, "=");
-      split = strtok(NULL, "=");
-      return split;
+  int i = -1;
+  char * rtrn;
+  while(ENV[++i]) {
+    if(startsWith(var, ENV[i])) {
+      char *rtrn = strchr(ENV[i], '=');
+      return rtrn+1;
     }
-    *ENV++;
   }
   return (NULL);
+}
+
+int checkPath(char * path) {
+  return 1;
+}
+
+int changeDir(char * path) {
+  char *cwd;
+  char buffer[UCHAR_MAX];
+  cwd = getcwd(buffer, UCHAR_MAX);
+
+  if (!chdir(path)) {
+    setenv("OLDPWD", cwd, 1);
+    setenv("PWD", path, 1);
+    return 1;
+  } else {
+    putstr("[47m[90m cd [37m[49m ");
+    if(access(path, F_OK) == -1) putstr("No such file or directory");
+    else if (access(path, R_OK) == -1) putstr("Permission denied");
+    else putstr("Not a directory");
+    _putchar('\n');
+    return 0;
+  }
 }
 
 /* BUILT IN FUNCTIONS */
 
 char * _DEFINED_FUNCTIONS[] = {"cd", "help", "env", "exit"};
 
-
 int cd(char **args) {
   char	*home;
-  while (*args) {
-    args++;
+  if(!args[1]) {
+    return changeDir(_getENV("HOME"));
   }
-  //printf("%s\n", _getENV("HOME"));
+  if(checkPath(args[1])) {
+    changeDir(args[1]);
+  }
   return (1);
 }
 
 int printenv(void) {
   int i = -1;
-  char *p;
   char *e;
-  int c = -1;
   while(ENV[++i]) {
     e = ENV[i];
     putstr("[47m[90m ");
