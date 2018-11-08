@@ -25,6 +25,9 @@ void putstr(char *s) {
     write(1, &*s++, 1);
   }
 }
+void _putchar(char c) {
+    write(1, &c, 1);
+}
 
 void prompt() {
   char prompt[UCHAR_MAX];
@@ -55,6 +58,7 @@ void prompt() {
 
 void terminate() {
   putstr("[39m[49m\n");
+  free(ENV);
   exit(0);
 }
 
@@ -75,8 +79,78 @@ void ExecHandler(int sig) {
   }
 }
 
+int startsWith(char * p, char * s) {
+  size_t lp = strlen(p);
+  return strlen(s) < lp ? 0 : strncmp(p, s, lp) == 0;
+}
+
+char * _getENV(char *var) {
+  char * split;
+  while (*ENV) {
+    if(startsWith(var, *ENV)) {
+      char *split = strtok(*ENV, "=");
+      split = strtok(NULL, "=");
+      return split;
+    }
+    *ENV++;
+  }
+  return (NULL);
+}
+
+/* BUILT IN FUNCTIONS */
+
+char * _DEFINED_FUNCTIONS[] = {"cd", "help", "env", "exit"};
+
+
+int cd(char **args) {
+  char	*home;
+  while (*args) {
+    args++;
+  }
+  //printf("%s\n", _getENV("HOME"));
+  return (1);
+}
+
+int printenv(void) {
+  int i = -1;
+  char *p;
+  char *e;
+  int c = -1;
+  while(ENV[++i]) {
+    e = ENV[i];
+    putstr("[47m[90m ");
+    while(*e) {
+      if(*e=='=') putstr(" [37m[49m ");
+      else _putchar(*e);
+      e++;
+    }
+    _putchar('\n');
+  }
+  return 0;
+}
+
+int help(void) {
+  putstr("[47m[90m ");
+  putstr("HELP");
+  putstr(" [37m[49m ");
+  putstr("Currently defined functions:");
+  putstr("\n");
+  for (size_t i = 0; i < sizeof(*_DEFINED_FUNCTIONS)-1; i++) {
+    putstr(" [47m[90m+[37m[49m ");
+    putstr(_DEFINED_FUNCTIONS[i]);
+    putstr("\n");
+    /* code */
+  }
+  return 0;
+}
+
+/* ENDS HERE */
+
 int notBuiltIn(struct cmd *line) {
   if(strcmp(line->argv[0], "exit") == 0) return -1;
+  else if(strcmp(line->argv[0], "env") == 0) return (printenv());
+  else if(strcmp(line->argv[0], "help") == 0) return (help());
+  else if(strcmp(line->argv[0], "cd") == 0) return (cd(line->argv));
   return 1;
 }
 
