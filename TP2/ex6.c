@@ -22,6 +22,8 @@ struct cmd {
   char **argv;
 };
 
+int notBuiltIn(struct cmd *line);
+
 void putstr(char *s) {
   while (*s) {
     write(1, &*s++, 1);
@@ -52,6 +54,27 @@ void ExecHandler(int sig) {
     kill(getpid(), SIGKILL);
     signal(SIGINT, handler);
   }
+}
+
+int	ft_atoi(char *str)
+{
+	int rslt;
+	int sgn;
+
+	rslt = 0;
+	sgn = 1;
+	while (*str == ' ' || (*str >= 9 && *str <= 13))
+		str++;
+	if (*str == '-')
+		sgn = -1;
+	if (*str == '-' || *str == '+')
+		str++;
+	while (*str >= '0' && *str <= '9')
+	{
+		rslt = rslt * 10 + *str - '0';
+		str++;
+	}
+	return (sgn * rslt);
 }
 
 int startsWith(char * p, char * s) {
@@ -184,6 +207,28 @@ int changeDir(char * path) {
   }
 }
 
+int exec(int fd[2], struct cmd *line) {
+  pid_t pid;
+  char buffer[UCHAR_MAX];
+  int isBuiltin;
+
+  if((isBuiltin = notBuiltIn(line))<=0) {
+    return isBuiltin;
+  }
+
+  if((pid=fork()) == -1) return -1;
+  if(pid == 0) {
+    close(fd[0]);
+    //signal(SIGINT, ExecHandler);
+    return execvp(line->argv[0], (char * const *)line->argv);
+  } else {
+    close(fd[1]);
+    read(fd[0], buffer, sizeof(buffer));
+  }
+  wait(&pid);
+  return pid;
+}
+
 void prompt() {
   char prompt[UCHAR_MAX];
   if(SHOW_NAME) {
@@ -249,13 +294,20 @@ void prompt() {
   }
   printf("\n");
   putstr("[90m>[37m[m "); /* TODO: Prompt custom */
-
 }
 
 
+void putErr(char * err) {
+  putstr(" [100m[91m");
+  putstr(" ⚠  [47m[90m");
+  putstr(err);
+  putstr(" [37m[49m ");
+  _putchar('\n');
+}
+
 /* BUILT IN FUNCTIONS */
 
-char * _DEFINED_FUNCTIONS[] = {"cd", "help", "env", "exit"};
+char * _DEFINED_FUNCTIONS[] = {"cd", "env", "eval", "exit", "help", "wait"};
 
 int cd(char **args) {
   char	*home;
@@ -266,6 +318,42 @@ int cd(char **args) {
     changeDir(args[1]);
   }
   return (1);
+}
+
+int _wait(char **args) {
+  int status = 0;
+  if(!args[1] || strcmp(args[1], "--help") == 0) {
+    putstr("[47m[90m ");
+    putstr("wait");
+    putstr(" [37m[49m ");
+    putstr("<time> Wait for a given amount of time.");
+    _putchar('\n');
+  } else {
+    int i = ft_atoi(args[1]);
+    if(i>0) sleep(i);
+    else putErr("Invalid option");
+  }
+
+  return status;
+}
+
+int _eval(char **args) {
+  if(!args[1] || strcmp(args[1], "--help") == 0) {
+    putstr("[47m[90m ");
+    putstr("eval");
+    putstr(" [37m[49m ");
+    putstr("<arg> Execute arguments as a shell command.");
+    _putchar('\n');
+    return 0;
+  }
+  char **com;
+  int fd[2], nbytes;
+  pipe(fd);
+  com = &args[1];
+  struct cmd line [] = {{com}};
+  int r = exec(fd, line);
+  close (fd [1]);
+  return r;
 }
 
 int printenv(void) {
@@ -306,29 +394,9 @@ int notBuiltIn(struct cmd *line) {
   else if(strcmp(line->argv[0], "env") == 0) return (printenv());
   else if(strcmp(line->argv[0], "help") == 0) return (help());
   else if(strcmp(line->argv[0], "cd") == 0) return (cd(line->argv));
+  else if(strcmp(line->argv[0], "wait") == 0) return (_wait(line->argv));
+  else if(strcmp(line->argv[0], "eval") == 0) return (_eval(line->argv));
   return 1;
-}
-
-int exec(int fd[2], struct cmd *line) {
-  pid_t pid;
-  char buffer[UCHAR_MAX];
-  int isBuiltin;
-
-  if((isBuiltin = notBuiltIn(line))<=0) {
-    return isBuiltin;
-  }
-
-  if((pid=fork()) == -1) return -1;
-  if(pid == 0) {
-    close(fd[0]);
-    //signal(SIGINT, ExecHandler);
-    return execvp(line->argv[0], (char * const *)line->argv);
-  } else {
-    close(fd[1]);
-    read(fd[0], buffer, sizeof(buffer));
-  }
-  wait(&pid);
-  return pid;
 }
 
 int processOne(char cmd[]) {
