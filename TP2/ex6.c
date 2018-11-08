@@ -5,6 +5,8 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <dirent.h>
 
 int run = 1;
 
@@ -27,33 +29,6 @@ void putstr(char *s) {
 }
 void _putchar(char c) {
     write(1, &c, 1);
-}
-
-void prompt() {
-  char prompt[UCHAR_MAX];
-  if(SHOW_NAME) {
-    char	hostname[UCHAR_MAX];
-    gethostname(hostname, UCHAR_MAX);
-    printf("[32m[49m%s[37m[49m ",hostname);
-  }
-  if(SHOW_CWD) {
-    char	cwd[UCHAR_MAX];
-    if (getcwd(cwd, UCHAR_MAX) != NULL) {
-      printf("[33m[49m%s[37m[49m ",cwd);
-    }
-  }
-  if(SHOW_GIT) {
-    char	cwd[UCHAR_MAX];
-    /*
-    ≡ No changes
-    ↓ commit waiting to pull
-    ↑ commit waiting to push
-     */
-    printf("[47m[90m%s%s%s%s%s[37m[49m ", "[", "master"," ≡ ", "+1", "]");
-  }
-  printf("\n");
-  putstr("[90m>[37m[m "); /* TODO: Prompt custom */
-
 }
 
 void terminate() {
@@ -84,6 +59,51 @@ int startsWith(char * p, char * s) {
   return strlen(s) < lp ? 0 : strncmp(p, s, lp) == 0;
 }
 
+int isDir(char * path) {
+  struct stat stats;
+  if (stat(path, &stats)!= 0) return 0;
+  return S_ISDIR(stats.st_mode);
+}
+
+int hasDir(char *path, char *dname) {
+  DIR *d;
+  struct dirent *dir;
+  d = opendir(path);
+  if (d) {
+    while((dir = readdir(d)) != NULL) if(strcmp(dir->d_name, dname) == 0) return 1;
+  }
+  return 0;
+}
+
+int isGitDir(char *path) {
+  FILE * fp;
+  char out[UCHAR_MAX];
+  fp = popen("git rev-parse --git-dir 2> /dev/null", "r");
+  if(fp == NULL) return 0;
+  while (fgets(out, sizeof(out)-1, fp) != NULL) {
+    if(startsWith("/",out) || startsWith(".git",out)) return 1;
+  }
+  return 0;
+}
+
+char * getGitBranch(char *path) {
+  FILE * fp;
+  char out[UCHAR_MAX];
+  char *rtrn;
+  fp = popen("git branch | grep \\* | cut -d ' ' -f2 2> /dev/null", "r");
+  if(fp == NULL) return 0;
+  while (fgets(out, sizeof(out)-1, fp) != NULL) {
+  }
+  size_t i;
+  rtrn = (char *) malloc(sizeof *out);
+  for (i = 0; out[i]!='\n' && out[i]!='\0'; i++) {
+    rtrn[i] = out [i];
+  }
+  rtrn[i+1] = '\0';
+  //strncpy(out, rtrn, sizeof(out));
+  return rtrn;
+}
+
 char * _getENV(char *var) {
   int i = -1;
   char * rtrn;
@@ -104,7 +124,6 @@ int changeDir(char * path) {
   char *cwd;
   char buffer[UCHAR_MAX];
   cwd = getcwd(buffer, UCHAR_MAX);
-
   if (!chdir(path)) {
     setenv("OLDPWD", cwd, 1);
     setenv("PWD", path, 1);
@@ -118,6 +137,38 @@ int changeDir(char * path) {
     return 0;
   }
 }
+
+void prompt() {
+  char prompt[UCHAR_MAX];
+  if(SHOW_NAME) {
+    char	hostname[UCHAR_MAX];
+    gethostname(hostname, UCHAR_MAX);
+    printf("[32m[49m%s[37m[49m ",hostname);
+  }
+  if(SHOW_CWD) {
+    char	cwd[UCHAR_MAX];
+    if (getcwd(cwd, UCHAR_MAX) != NULL) {
+      printf("[33m[49m%s[37m[49m ",cwd);
+    }
+  }
+  if(SHOW_GIT) {
+    char	cwd[UCHAR_MAX];
+    if (getcwd(cwd, UCHAR_MAX) != NULL) {
+      if(isGitDir(cwd)) {
+        /*
+        ≡ No changes
+        ↓ commit waiting to pull
+        ↑ commit waiting to push
+        */
+        printf("[47m[90m%s%s%s%s%s[37m[49m ", "[", getGitBranch(cwd)," ≡ ", "+1", "]");
+      }
+    }
+  }
+  printf("\n");
+  putstr("[90m>[37m[m "); /* TODO: Prompt custom */
+
+}
+
 
 /* BUILT IN FUNCTIONS */
 
