@@ -104,6 +104,52 @@ char * getGitBranch(char *path) {
   return rtrn;
 }
 
+int getGitPushPending(char *path) {
+  FILE * fp;
+  char out[UCHAR_MAX];
+  char *rtrn;
+  int cnt = 0;
+  fp = popen("git cherry -v 2> /dev/null", "r");
+  if(fp == NULL) return 0;
+  while (fgets(out, sizeof(out)-1, fp) != NULL) {
+    if(startsWith("+ ", out)) cnt++;
+  }
+  //strncpy(out, rtrn, sizeof(out));
+  return cnt;
+}
+
+int getGitAdded(char *path) {
+  FILE * fp;
+  char out[UCHAR_MAX];
+  char *rtrn;
+  int cnt = 0;
+  fp = popen("git status --porcelain --branch 2> /dev/null", "r");
+  if(fp == NULL) return 0;
+  while (fgets(out, sizeof(out)-1, fp) != NULL)  if(startsWith("A  ", out)) cnt++;
+  return cnt;
+}
+
+int getGitModified(char *path) {
+  FILE * fp;
+  char out[UCHAR_MAX];
+  char *rtrn;
+  int cnt = 0;
+  fp = popen("git status --porcelain --branch 2> /dev/null", "r");
+  if(fp == NULL) return 0;
+  while (fgets(out, sizeof(out)-1, fp) != NULL)  if(startsWith(" M ", out)) cnt++;
+  return cnt;
+}
+int getGitDeleted(char *path) {
+  FILE * fp;
+  char out[UCHAR_MAX];
+  char *rtrn;
+  int cnt = 0;
+  fp = popen("git status --porcelain --branch 2> /dev/null", "r");
+  if(fp == NULL) return 0;
+  while (fgets(out, sizeof(out)-1, fp) != NULL) if(startsWith(" D ", out)) cnt++;
+  return cnt;
+}
+
 char * _getENV(char *var) {
   int i = -1;
   char * rtrn;
@@ -160,7 +206,44 @@ void prompt() {
         ↓ commit waiting to pull
         ↑ commit waiting to push
         */
-        printf("[47m[90m%s%s%s%s%s[37m[49m ", "[", getGitBranch(cwd)," ≡ ", "+1", "]");
+        int pending = getGitPushPending(cwd);
+        int modified = getGitModified(cwd);
+        int added = getGitAdded(cwd);
+        int deleted = getGitDeleted(cwd);
+        char pbuff[UCHAR_MAX];
+        char cbuff[UCHAR_MAX];
+        if(pending>0) {
+          sprintf(pbuff, " ↑%d", pending);
+        } else {
+          sprintf(pbuff, " ≡");
+        }
+        if(modified != 0) {
+          if(added != 0) {
+              if(deleted != 0) {
+                sprintf(cbuff, " ~%d +%d -%d", modified, added, deleted);
+              } else {
+                sprintf(cbuff, " ~%d +%d", modified, added);
+              }
+          } else {
+            if(deleted != 0) {
+              sprintf(cbuff, " ~%d -%d", modified, deleted);
+            } else {
+              sprintf(cbuff, " ~%d", modified);
+            }
+          }
+        } else {
+          if(added != 0) {
+            sprintf(cbuff, " +%d", added);
+            sprintf(cbuff, " +%d -%d", added, deleted);
+          } else {
+            if(deleted != 0) {
+              sprintf(cbuff, " -%d", deleted);
+            } else {
+              sprintf(cbuff, " ");
+            }
+          }
+        }
+        printf("[47m[90m%s%s%s%s%s[37m[49m ", "[", getGitBranch(cwd),pbuff, cbuff, "]");
       }
     }
   }
