@@ -4,19 +4,25 @@
 #include <unistd.h>
 #include <limits.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <string.h>
+
+#define WAIT_ANY (-1)
 
 int run = 1;
 
 char **ENV;
 
+pid_t last;
+
 /* Temporary confing vars */
 
 int SHOW_CWD = 1;
 int SHOW_NAME = 1;
-int SHOW_GIT = 1;
+int SHOW_GIT = 0;
 
 struct cmd {
   char **argv;
@@ -50,10 +56,41 @@ void handler(int sig) {
 void ExecHandler(int sig) {
   if(sig == SIGINT) {
     putstr("\n");
-    printf("%d\n", getpid());
+    /*printf("%d\n", getpid());*/
     kill(getpid(), SIGKILL);
     signal(SIGINT, handler);
   }
+}
+
+void pass(int sig) {}
+
+void chldHandler(int sig) {
+	pid_t pid;
+	int status;
+
+	pid = waitpid(WAIT_ANY, &status, WNOHANG | WUNTRACED);
+	if (pid == -1) {
+		perror("Wait error");
+		//exit(1);
+	}
+	if (pid > 0) {
+
+		//printf("%d %d %d\n", pid,getpgrp(),  getpid());
+
+		if(WIFEXITED(status)) {
+			printf("[%d] Terminated (Status: %d)\n", pid, WEXITSTATUS(status));
+			return;
+		}
+
+		if(WIFSIGNALED(status)) {
+			printf("[%d] Terminated (Signal: %d)\n", pid, WTERMSIG(status));
+			return;
+		}
+		if(WIFSTOPPED(status)) {
+			printf("[%d] Stopped (Signal: %d)\n", pid, WSTOPSIG(status));
+			return;
+		}
+	}
 }
 
 int	ft_atoi(char *str)
@@ -75,6 +112,27 @@ int	ft_atoi(char *str)
 		str++;
 	}
 	return (sgn * rslt);
+}
+
+char* ft_itoa(int i, char buff[], int base) {
+  char const digit[] = "0123456789";
+  char *rslt = buff;
+  if(i<0) {
+    *rslt++ = '-';
+    i *= -1;
+  }
+  int nb = i;
+  while(nb) {
+    ++rslt;
+    nb /= base;
+  }
+  *rslt = '\0';
+  while(i) {
+    *--rslt = digit[i%base];
+    i /= base;
+  }
+  return rslt;
+
 }
 
 int startsWith(char * p, char * s) {
@@ -196,18 +254,18 @@ int changeDir(char * path) {
   if (!chdir(path)) {
     setenv("OLDPWD", cwd, 1);
     setenv("PWD", path, 1);
-    return 1;
+    return 0;
   } else {
     putstr("[47m[90m cd [37m[49m ");
     if(access(path, F_OK) == -1) putstr("No such file or directory");
     else if (access(path, R_OK) == -1) putstr("Permission denied");
     else putstr("Not a directory");
     _putchar('\n');
-    return 0;
+    return 1;
   }
 }
 
-int exec(int fd[2], struct cmd *line) {
+int exec(int fd[2], struct cmd *line, int bg) {
   pid_t pid;
   char buffer[UCHAR_MAX];
   int isBuiltin;
@@ -215,6 +273,11 @@ int exec(int fd[2], struct cmd *line) {
   if((isBuiltin = notBuiltIn(line))<=0) {
     return isBuiltin;
   }
+  if (bg == 1) {
+ 	 signal(SIGCHLD, chldHandler);
+  } else {
+	signal(SIGCHLD, pass);
+ }
 
   if((pid=fork()) == -1) return -1;
   if(pid == 0) {
@@ -225,7 +288,7 @@ int exec(int fd[2], struct cmd *line) {
     close(fd[1]);
     read(fd[0], buffer, sizeof(buffer));
   }
-  wait(&pid);
+  if(bg == 0) wait(&pid);
   return pid;
 }
 
@@ -288,7 +351,9 @@ void prompt() {
             }
           }
         }
+        //sprintf(cbuff, " ~%d +%d -%d", modified, added, deleted);
         printf("[47m[90m%s%s%s%s%s[37m[49m ", "[", getGitBranch(cwd),pbuff, cbuff, "]");
+
       }
     }
   }
@@ -307,17 +372,18 @@ void putErr(char * err) {
 
 /* BUILT IN FUNCTIONS */
 
-char * _DEFINED_FUNCTIONS[] = {"cd", "env", "eval", "exit", "help", "wait"};
+char * _DEFINED_FUNCTIONS[] = {"cd", "env", "eval", "exit", "help", "wait",0};
 
 int cd(char **args) {
   char	*home;
   if(!args[1]) {
-    return changeDir(_getENV("HOME"));
+    changeDir(_getENV("HOME"));
+    return 0;
   }
   if(checkPath(args[1])) {
-    changeDir(args[1]);
+    return changeDir(args[1]);
   }
-  return (1);
+  return 1;
 }
 
 int _wait(char **args) {
@@ -347,11 +413,12 @@ int _eval(char **args) {
     return 0;
   }
   char **com;
+  int bg = 0;
   int fd[2], nbytes;
   pipe(fd);
   com = &args[1];
   struct cmd line [] = {{com}};
-  int r = exec(fd, line);
+  int r = exec(fd, line, bg);
   close (fd [1]);
   return r;
 }
@@ -378,7 +445,7 @@ int help(void) {
   putstr(" [37m[49m ");
   putstr("Currently defined functions:");
   putstr("\n");
-  for (size_t i = 0; i < sizeof(*_DEFINED_FUNCTIONS)-1; i++) {
+  for (size_t i = 0; _DEFINED_FUNCTIONS[i]; i++) {
     putstr(" [47m[90m+[37m[49m ");
     putstr(_DEFINED_FUNCTIONS[i]);
     putstr("\n");
@@ -403,9 +470,19 @@ int processOne(char cmd[]) {
   int fd[2], nbytes;
   int i = 0;
   int rtrn = 0;
+  int bg = 0;
   char * split;
+  char * pipes;
   char *args[UCHAR_MAX];
   char **com;
+
+  pipes = strtok(cmd, "|");
+  while (pipes != NULL && i+1<UCHAR_MAX)
+  {
+    printf("%s\n", pipes);
+    strncat(pipes, "\0", sizeof(pipes)+1);
+    pipes = strtok(NULL, "|");
+  }
 
   pipe(fd);
 
@@ -414,18 +491,23 @@ int processOne(char cmd[]) {
   {
     args[i++] = split;
     strncat(split, "\0", sizeof(split)+1);
-    //printf("%s\n",split);
     split = strtok(NULL, " ");
   }
-  args[i] = 0;
-
+  if(strcmp(args[i-1],"&")==0) {
+	args[i-1]= 0;
+	bg = 1;
+  } else {
+    args[i]=0;
+  }
   if(i>=0) {
     if(i==0) {
-      com = malloc(2*sizeof(*cmd));
+      com = args;
+      //com = malloc(2*sizeof(*cmd));
       com[0] = cmd;
       com[1] = 0;
     } else {
-      com = malloc(i*sizeof(*cmd));
+      com = args;
+      //com = malloc(i*sizeof(*cmd));
       size_t n;
       for (n = 0; n < i; n++) {
         com[n] = args[n];
@@ -434,7 +516,10 @@ int processOne(char cmd[]) {
     }
     struct cmd line [] = {{com}};
 
-    rtrn = exec(fd, line);
+    rtrn = exec(fd, line, bg);
+  	if(rtrn == -1 && errno == ENOENT) {
+  		printf("not found : %s \n", args[0]);
+  	}
   }
   close (fd [1]);
   return rtrn;
@@ -445,9 +530,9 @@ void testSub(char * cmd) {
   int fd[2], nbytes;
 
   pipe(fd);
-  char *ls[] = { cmd, 0 };
+  char *ls[] = { cmd };
   struct cmd line [] = {{ls}};
-  exec(fd, line);
+  exec(fd, line, 0);
   close (fd [1]);
 }
 
