@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include "structs.h"
 
 extern char **environ;
 char *paths;
@@ -14,17 +15,9 @@ static int last_path_index = 0;
 
 static int last_exec_err = 0;
 
-static void exec(char *, char **, char **);
-
-static void init() {
-  char **envp;
-
-}
-
-void trace(char src[], char err[]) {
-  printf("%s : %s\n",src, err);
-  exit(EXIT_FAILURE);
-}
+/*
+ * Real stuff begins here
+ */
 
 static void pathParse(char * p) {
   paths = (char *) malloc((strlen(p)) * sizeof(char*));
@@ -37,7 +30,7 @@ char * pathStep(char *cmd) {
   e = b = last_path_index;
   while(paths[e]!='\0' && paths[e] != ':' && paths[e] != '%') e++;
   if(b==e) return NULL;
-  printf("%s %d\n", cmd, strlen(cmd));
+  //printf("%s %d\n", cmd, strlen(cmd));
   int l = e-b+strlen(cmd)+2;
   char * s = (char *) malloc(l*sizeof(char*));
   strncpy(s, paths+b, e-b);
@@ -48,14 +41,14 @@ char * pathStep(char *cmd) {
   return s;
 }
 
-static char ** environment() {
+char ** environment() {
   char **envp;
   char p[] = "PATH";
   for (envp = environ ; *envp ; envp++) {
     if (strchr(*envp, '=')) {
       if(strncmp (p,*envp, 4) == 0) {
         pathParse(*envp);
-        printf("%s\n", paths);
+        //printf("%s\n", paths);
       }
     }
   }
@@ -63,7 +56,7 @@ static char ** environment() {
   return envp;
 }
 
-static void run(char **argv, char **envp) {
+void run(char **argv, char **envp) {
   char *tryCmd;
   int e;
   if (strchr(argv[0], '/') != NULL) {
@@ -72,7 +65,7 @@ static void run(char **argv, char **envp) {
   } else {
     e = ENOENT; //No such file or dir
     while((tryCmd = pathStep(argv[0])) != NULL) {
-      printf("%s\n", tryCmd);
+      //printf("%s\n", tryCmd);
       exec(tryCmd, argv, envp);
       if(errno != ENOENT && errno != ENOTDIR) e = errno;
     }
@@ -80,6 +73,7 @@ static void run(char **argv, char **envp) {
   }
   struct stat infos;
   if (errno != ENOEXEC) {
+    printf("err\n");
     if((stat(argv[0], &infos) == 0) && (S_ISDIR(infos.st_mode))) {
       last_exec_err = 21; //EISDIR
       trace(argv[0], "directory");
@@ -90,12 +84,13 @@ static void run(char **argv, char **envp) {
         case EACCES: last_exec_err = 126; break;
         default: last_exec_err = 2; break;
       }
+      trace(argv[0], strerror(e));
     }
   } else {
     int fd  = open(argv[0], O_RDONLY);
     if(fd!=-1) {
-      char header[32]; // read the 32 firsts chars, searching for a shell insctruction
-      int header_l = read(fd, &header[0], 32);
+      char header[80]; // read the 80 firsts chars, searching for a shell insctruction
+      int header_l = read(fd, &header[0], 80);
       close(fd);
       if(header_l == 0) return ;//0; // empty file, nothing to do
       if(header_l > 0 && header[0] == '#' && header[1] == '!') {
@@ -111,7 +106,7 @@ static void run(char **argv, char **envp) {
       last_exec_err = 26; //ETXTBSY
     }
   }
-  trace(argv[0], "");
+  trace(argv[0], strerror(e));
 }
 
 static void exec(char *cmd, char ** argv, char ** envp) {
@@ -124,14 +119,21 @@ static void exec(char *cmd, char ** argv, char ** envp) {
   errno = e;
 }
 
-int main(int argc, char const *argv[]) {
+/*
+ * Is that unit test ???
+ */
+
+
+int exec_main(int argc, char *argv[]) {
+  printf("[47m[90m EXEC MAIN TEST [37m[49m\n");
   char** exe = (char *[]){"ech64", "hello", "yay", NULL};
   char** exe2 = (char *[]){"/bin/ls", "-la", NULL};
   char** exe3 = (char *[]){"ls", "-la", NULL};
+  char** exe4 = (char *[]){"test.sh", NULL};
 
   char** envp = environment();
 
-  run(exe3, envp);
+  run(exe4, envp);
   //exec(exe[0], exe, envp);
   return 0;
 }
