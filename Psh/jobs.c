@@ -4,14 +4,25 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <limits.h>
 #include "structs.h"
 
 /*
  * Process
  */
 
+void dumpProcess(process *p) {
+  for (size_t i = 0; p->argv[i]; i++) {
+    printf("%s ", p->argv[i]);
+  }
+}
+
 process * makeProcess(process * next, char **argv, pid_t pid, char c, char s, char st) {
   process *p = malloc(sizeof(process));
+  if(!p) {
+    perror("malloc");
+    return NULL;
+  }
   p->next = next;
   p->argv = argv;
   p->pid = pid;
@@ -19,6 +30,28 @@ process * makeProcess(process * next, char **argv, pid_t pid, char c, char s, ch
   p->stopped = s;
   p->status = st;
   return p;
+}
+
+process * makeEmptyProcess() {
+  process *p = malloc(sizeof(process));
+  if(!p) {
+    perror("malloc");
+    return NULL;
+  }
+  p->next = NULL;
+  p->argv = NULL;
+  p->completed = 0;
+  p->stopped = 0;
+  return p;
+}
+
+void freeProcess(process *p) {
+  if(!p->argv) return;
+  int i;
+  for (i = 0; p->argv[i] && i<UCHAR_MAX; i++) {
+    free(p->argv[i]);
+  }
+  free(p->argv[i]);
 }
 
 /*
@@ -32,16 +65,26 @@ job* makeEmptyJob() {
     return NULL;
   }
   j->head = NULL;
+  j->valid = 1;
+  j->id = 0;
+  j->infile = NULL;
+  j->outfile = NULL;
+  j->in = STDIN_FILENO;
+  j->out = STDOUT_FILENO;
+  j->err = STDERR_FILENO;
+  j->fg = 1;
+  j->stopping = 0;
+  j->pgid = 0;
+  return j;
 }
 
-job * makeJob(job *next, char * command, process *p, pid_t pgid, char s, struct termios tm, int in ,int out, int err) {
+job * makeJob(job *next, process *p, pid_t pgid, char s, struct termios tm, int in ,int out, int err) {
   job *j = malloc(sizeof(job));
   if(!j) {
     perror("malloc");
     return NULL;
   }
   j->next = next;
-  j->command = command;
   j->head = p;
   j->pgid = pgid;
   j->stopping = s;
@@ -52,9 +95,29 @@ job * makeJob(job *next, char * command, process *p, pid_t pgid, char s, struct 
   return j;
 }
 
+
+void freeJob(job *j) {
+  if(!j) return;
+  process *p = j->head;
+  while(p) {
+    process *p2 = p->next;
+    freeProcess(p);
+    p = p2;
+  }
+  free(j->infile);
+  free(j->outfile);
+}
+
 job * findJob(pid_t pgid) {
   job *j;
   for(j=head; j; j= j->next) if(j->pgid == pgid) return j;
+  return NULL;
+}
+
+job * findJobId(int id) {
+  if(id<1) return NULL;
+  job *j;
+  for(j=head; j; j= j->next) if(j->id == id) return j;
   return NULL;
 }
 
@@ -70,14 +133,28 @@ int isJobCompleted(job *j) {
   return 1;
 }
 
-int addJob(pid_t pgid, char * command, process * p) {
+void dumpJob(job *j) {
+  if(!j->id) {
+    fprintf(stderr, "Invalid job\n");
+    return;
+  }
+  process *p;
+  int i = 0;
+  if(j->infile) printf("In : %s\n", j->infile);
+  if(j->outfile) printf("Out : %s\n", j->outfile);
+  for (p = j->head; p; p=p->next) {
+    dumpProcess(p);
+  }
+}
+
+int addJob(pid_t pgid, process * p) {
   job *j;
   int i = 1;
   if(head == NULL) {
     j = malloc(sizeof(job));
     j->next = NULL;
     j->pgid = pgid;
-    j->command = command;
+    //j->command = command;
     j->head = p;
     j->stopping = 0;
     j->tmodes = _tmodes;
@@ -93,7 +170,7 @@ int addJob(pid_t pgid, char * command, process * p) {
         jn = malloc(sizeof(job));
         jn->next = NULL;
         jn->pgid = pgid;
-        jn->command = command;
+        //jn->command = command;
         jn->head = p;
         jn->stopping = 0;
         jn->tmodes = _tmodes;
@@ -109,11 +186,11 @@ int addJob(pid_t pgid, char * command, process * p) {
 }
 
 void printJob(job *j) {
-  printf("[%d] %s (%d %d:%d:%d)\n", j->pgid,j->command, j->stopping, j->in , j->out , j->err);
+  printf("[%d] (%d %d:%d:%d)\n", j->pgid, j->stopping, j->in , j->out , j->err);
 }
 
 void traceJob(job *j, char * status) {
-  fprintf(stderr, "%ld (%s): %s\n", (long)j->pgid, status, j->command);
+  fprintf(stderr, "%ld (%s)\n", (long)j->pgid, status);
 }
 
 void printAllJobs() {
@@ -190,11 +267,6 @@ void waitJob(job *j) {
   } while(!processStatus(pid, status) && isJobStopped(j) && isJobCompleted(j));
 }
 
-void freeJob(job *j) {
-  free(j->head);
-  free(j);
-}
-
 void notifyJobs() {
   job *j, *je, *jn;
   process *p;
@@ -220,6 +292,7 @@ void notifyJobs() {
 }
 
 void jobFg(job *j, int cnt) {
+  j->fg = 1;
   tcsetpgrp(_term, j->pgid);
   if(cnt) {
     tcsetattr(_term, TCSADRAIN, &j->tmodes);
@@ -232,6 +305,7 @@ void jobFg(job *j, int cnt) {
 }
 
 void jobBg(job *j, int cnt) {
+  j->fg = 0;
   if(cnt) {
     if(kill(- j->pgid, SIGCONT) < 0) perror("SIGCONT : cannot continue");
   }
@@ -273,15 +347,15 @@ int jobs_main(int argc, char *argv[]) {
   printf("[47m[90m JOBS MAIN TEST [37m[49m\n");
   //(process * next, char **argv, pid_t pid, char c, char s, char st)
   process *p = makeProcess(NULL, argv, 10, 0, 0, 0);
-  addJob(110, "lol", p);
+  addJob(110, p);
   printAllJobs();
-  addJob(111, "lol2", p);
+  addJob(111, p);
   printAllJobs();
   removeJob(110);
   printAllJobs();
   removeJob(111);
   printAllJobs();
-  addJob(112, "lol3", p);
+  addJob(112, p);
   printAllJobs();
   removeJob(112);
   printAllJobs();

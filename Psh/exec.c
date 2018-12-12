@@ -56,6 +56,18 @@ char ** environment() {
   return envp;
 }
 
+char * _getENV(char *var) {
+	int i = -1;
+	char * rtrn;
+	while(ENV[++i]) {
+		if(startsWith(var, ENV[i])) {
+			char *rtrn = strchr(ENV[i], '=');
+			return rtrn+1;
+		}
+	}
+	return (NULL);
+}
+
 void run(char **argv, char **envp) {
   char *tryCmd;
   int e;
@@ -132,6 +144,8 @@ int exec_main(int argc, char *argv[]) {
   char** exe4 = (char *[]){"test.sh", NULL};
 
   char** envp = environment();
+
+  printf("%s\n", _getENV("HOME"));
 
   run(exe4, envp);
   //exec(exe[0], exe, envp);

@@ -34,19 +34,29 @@ process * makeProcess(process * next, char **argv, pid_t pid, char c, char s, ch
 typedef struct job
 {
   struct job *next;
-  char *command;
+  int id;
+  int valid;
   process *head;
   pid_t pgid;
   char stopping;
   struct termios tmodes;
+  char* infile;
+  char * outfile;
   int in, out, err;
+  int fg;
 } job;
 
-int addJob(pid_t pgid, char * command, process * p);
-job * makeJob(job *next, char * command, process *p, pid_t pgid, char s, struct termios tm, int in ,int out, int err);
+int addJob(pid_t pgid, process * p);
+job* makeEmptyJob();
+job * makeJob(job *next, process *p, pid_t pgid, char s, struct termios tm, int in ,int out, int err);
+void runBuiltin(process *p, int _in, int _out, int _err);
 void waitJob(job *j);
+void dumpJob(job *j);
 void jobFg(job *j, int cnt);
 void jobBg(job *j, int cnt);
+void traceJob(job *j, char * status);
+void notifyJobs();
+void waitfor(pid_t pid);
 
 char **ENV;
 job *head;
@@ -55,7 +65,19 @@ struct termios _tmodes;
 int _term;
 int _itty;
 
+int isBuiltin(process *p);
+int changeDir(char * path);
+char * _getENV(char *var);
+
+void putstr(char *s);
+void _putchar(char c);
+int startsWith(char * p, char * s);
+int checkPath(char * path);
+
+/* BUILTIN */
+int cd(char **args);
 
 int jobs_main(int argc, char *argv[]);
 int exec_main(int argc, char *argv[]);
 int eval_main(int argc, char *argv[]);
+int builtin_main(int argc, char *argv[]);
