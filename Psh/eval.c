@@ -122,6 +122,12 @@ int eval_main(int argc, char *argv[]) {
   char** exe5 = (char *[]){"awk", "{print $1\" what is this\"}", NULL};
   char** exe6 = (char *[]){"sed", "-e", "s/this/dis/g", NULL};
   char** exe7 = (char *[]){"xargs", "-I", "{}", "echo", "{}", "?", NULL};
+  char** exee = (char *[]){"cat", NULL};
+  char** exee2 = (char *[]){"sed","-e","s/very/not that/g", NULL};
+  char** exee3 = (char *[]){"cut","-b-20", NULL};
+  char** exee4 = (char *[]){"tr","[:lower:]","[:upper:]", NULL};
+
+
   process *p = makeProcess(NULL, exe, 10, 0, 0, 0);
   process *p3 = makeProcess(NULL, exe3, 10, 0, 0, 0);
   process *p2 = makeProcess(p3, exe2, 10, 0, 0, 0);
@@ -132,6 +138,11 @@ int eval_main(int argc, char *argv[]) {
   process *P4 = makeProcess(P5, exe4, 10, 0, 0, 0);
   process *P3 = makeProcess(P4, exe3, 10, 0, 0, 0);
   process *P2 = makeProcess(P3, exe2, 10, 0, 0, 0);
+  process *pe = makeProcess(NULL, exee, 10, 0, 0, 0);
+  process *Pe4 = makeProcess(NULL, exee4, 10, 0, 0, 0);
+  process *Pe3 = makeProcess(Pe4, exee3, 10, 0, 0, 0);
+  process *Pe2 = makeProcess(Pe3, exee2, 10, 0, 0, 0);
+  process *Pe = makeProcess(Pe2, exee, 10, 0, 0, 0);
 
   pid_t pgid = getpid();
   job *j = makeJob(NULL, p2, pgid, 0, _tmodes, 0, 1, 2);
@@ -143,6 +154,17 @@ int eval_main(int argc, char *argv[]) {
   job *j2 = makeJob(NULL, P2, pgid, 0, _tmodes, 0, 1, 2);
   j2->outfile = "f1.txt";
   runJob(j2, 1, &id);
+
+
+  job *j3 = makeJob(NULL, pe, pgid, 0, _tmodes, 0, 1, 2);
+  j3->infile = "in";
+  runJob(j3, 1, &id);
+
+  //cat <in| sed -e 's/very/not that/g' | cut -b-20 | tr [:lower:] [:upper:] >out
+  job *j4 = makeJob(NULL, Pe, pgid, 0, _tmodes, 0, 1, 2);
+  j4->infile = "in";
+  j4->outfile = "out";
+  runJob(j4, 1, &id);
   //runCmd(p, pgid, 0, 1, 2, 1);
   //printf("> should write ls output :\n");
   //wait(NULL);
