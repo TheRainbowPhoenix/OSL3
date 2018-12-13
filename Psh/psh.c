@@ -10,10 +10,12 @@
 #include <unistd.h>
 #include <string.h>
 #include <limits.h>
-#include<stdio.h>
-#include<stdlib.h>
-#include<sys/wait.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/wait.h>
 #include <termios.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 job *head = NULL;
 
@@ -95,6 +97,42 @@ int notBuiltIn(char **argv) {
 // echo aa | tr 'a' 'A' >>out; cat out;
 //   p0    |   p1       +> f
 //   p0
+
+process * parseProcess(char *args, int *fg) {
+  process *p;
+  char ** exe = (char *[]){"ls", "-la", NULL};
+  char buff[UCHAR_MAX];
+
+  printf("%s\n", args);
+  int i = 0;
+  int j = 0;
+  int flg = 0;
+  while (*args != '\0' && i<UCHAR_MAX) {
+    buff[i] = *args;
+    /*switch (*args) {
+      case '&': fg = 0; break;
+      case ' ': while(*args==' ' && *args) args++;
+        buff[i] = '\0';
+        exe[j] = buff;
+        printf("%s\n", buff);
+        i = 0;
+        j++;
+        break;
+      default: buff[i] = *args;
+    }*/
+    args++;
+    i++;
+  }
+  buff[i] = '\0';
+  printf("b: %s\n", buff);
+  exe[j] = calloc(1, i+1 );
+  memcpy(exe[j], buff, i+1);
+
+  p = makeProcess(NULL, exe, 10, 0, 0, 0);
+  //p->argv = exe;
+  return p;
+}
+
 int parseCmd(char raw[]) {
   int n = -1;
   int i = 0;
@@ -106,27 +144,45 @@ int parseCmd(char raw[]) {
   char * commands[UCHAR_MAX];
   char * jobs[UCHAR_MAX];
   char * procs[UCHAR_MAX];
+
+  job * jb;
+  process *p = NULL;
+  process *op = NULL;
+  char** exe;
   //token = strtok(raw, ";");
 
   token = strtok(raw, ";");
   while(token != NULL && n+1<UCHAR_MAX) {
     commands[++n] = token;
-    while(*token==' ') *token++;
+    while(*token==' ') token++;
     //printf("%d : %s\n", n, token);
     token = strtok(NULL, ";");
   }
   commands[++n] = '\0';
   for (n=0; commands[n] != '\0'; n++) {
+
+    jb = makeEmptyJob();
+
     pipes = strtok(commands[n], "|");
     printf("%d ", n);
     i = -1;
     while(pipes != NULL && i+1<UCHAR_MAX) {
-      while(*pipes==' ') *pipes++;
+      while(*pipes==' ') pipes++;
+
       jobs[++i] = pipes;
-      printf("%s |", pipes);
+
+      if(p!=NULL) op = p;
+      p = parseProcess(pipes, &jb->fg);
+      if(jb->head==NULL) jb->head = p;
+      if(op != NULL) p->next = op;
+
+      //printf("%s |", pipes);
       pipes = strtok(NULL, "|");
     }
-    printf(" (%d)\n", i);
+    if(op != NULL) op=NULL;
+    if(p != NULL) p=NULL;
+    if(jb != NULL) jb=NULL;
+    if(i > 0)  printf(" (%d)\n", i);
       //printf("%s\n", commands[i]);
 
   }
@@ -180,7 +236,7 @@ int parseCmd(char raw[]) {
  */
 
 char * getPrevious() {
-  char p[1024];
+  char *p = calloc(1, 6); //strlen(exit)+1
   int sz;
   printf("\33[2K\r%sexit", ps1);
   sz = sprintf(p, "exit");
@@ -193,17 +249,23 @@ int readInput() {
 	int i = -1;
 	char input[1024]; //TODO : free !
   int cflag = 0;
+  setbuf(stdout, 0);
 	//while((rc = read(0, &buffer, 1)) && i++<UCHAR_MAX-1 && buffer != '\n') {
 	while((buffer = getchar()) && i++<UCHAR_MAX-1 && buffer != '\n') {
     //printf("%d\n", buffer);
     if(buffer == VK_BKSP) {
       input[--i] = '\0';
       i--;
-      printf("\33[2K\r%s%s", ps1, input);
+      printf("\r");
+      for (size_t i = strlen(input)+strlen(ps1)+1; i >0; i--) {
+        _putchar(' ');
+      }
+      printf("\r%s%s", ps1, input);
+      fflush(stdout);
     } else {
       if(cflag == 2) {
         char *c = getPrevious();
-        for (i = 0; i < strlen(c); i++) input[i] = c[i];
+        for (i = 0; i < ((c!=NULL)?strlen(c):0); i++) input[i] = c[i];
         input[i] = '\0';
         cflag = -1;
       }

@@ -2,6 +2,7 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <string.h>
 #include "structs.h"
 
 void putstr(char *s) {

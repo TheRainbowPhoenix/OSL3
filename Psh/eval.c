@@ -3,10 +3,14 @@
  */
 
  #include <signal.h>
+ #include <stdio.h>
  #include <stdlib.h>
  #include <unistd.h>
  #include <sys/types.h>
  #include <sys/wait.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <string.h>
  #include "structs.h"
 
 void runCmd(process *p, pid_t pgid, int _in, int _out, int _err, int fg) {
@@ -170,10 +174,14 @@ int eval_main(int argc, char *argv[]) {
   j4->outfile = "out";
   runJob(j4, 1, &id);
 
+  _readf("f1.txt");
+
   job *j5 = makeJob(NULL, P2, pgid, 0, _tmodes, 0, 1, 2);
   j5->outfile = "f1.txt";
   j5->wmode = 2;
   runJob(j5, 1, &id);
+
+  _readf("f1.txt");
 
   job *j6 = makeJob(NULL, p2, pgid, 0, _tmodes, 0, 1, 2);
   j6->outfile = "f1.txt";
@@ -181,8 +189,22 @@ int eval_main(int argc, char *argv[]) {
   runJob(j6, 1, &id);
 
   _readf("f1.txt");
+
+  job *jp = j;
+  jp->outfile = "f1.txt";
+  jp->wmode = 2;
+  runJob(jp, 0, &id);
+
+
+  j = makeJob(NULL, p2, pgid, 0, _tmodes, 0, 1, 2);
+  runJob(j, 1, &id);
+  runJob(j, 1, &id);
+
+  _readf("f1.txt");
+
   //runCmd(p, pgid, 0, 1, 2, 1);
   //printf("> should write ls output :\n");
+
   //wait(NULL);
   //runCmd(p, pgid, 0, 1, 2, 1);
   //runCmd(process *p, pid_t pgid, int _in, int _out, int _err, int fg)
