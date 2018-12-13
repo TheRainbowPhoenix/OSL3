@@ -78,7 +78,79 @@ int notBuiltIn(char **argv) {
 
 /* TODO: move to parsers */
 
+/*
+ * Supported chars
+ *
+ * '\n'=> newline
+ * ' ' => seprarate process args
+ * '\''=> args block
+ * '&' =>  backgnd / (+ '&' == AND)
+ * '|' => pipe (job processes) / (+ '|' == OR)
+ * ';' => 'Job' separator
+ * '(' => Begin block
+ * ')' => End   -----
+ * '#' => comment (ignore line except first)
+ * '\\'=> add another line
+ */
+// echo aa | tr 'a' 'A' >>out; cat out;
+//   p0    |   p1       +> f
+//   p0
 int parseCmd(char raw[]) {
+  int n = -1;
+  int i = 0;
+  int j = -1;
+  int skip = 0;
+  char * token;
+  char * pipes;
+  char * split;
+  char * commands[UCHAR_MAX];
+  char * jobs[UCHAR_MAX];
+  char * procs[UCHAR_MAX];
+  //token = strtok(raw, ";");
+
+  token = strtok(raw, ";");
+  while(token != NULL && n+1<UCHAR_MAX) {
+    commands[++n] = token;
+    while(*token==' ') *token++;
+    //printf("%d : %s\n", n, token);
+    token = strtok(NULL, ";");
+  }
+  commands[++n] = '\0';
+  for (n=0; commands[n] != '\0'; n++) {
+    pipes = strtok(commands[n], "|");
+    printf("%d ", n);
+    i = -1;
+    while(pipes != NULL && i+1<UCHAR_MAX) {
+      while(*pipes==' ') *pipes++;
+      jobs[++i] = pipes;
+      printf("%s |", pipes);
+      pipes = strtok(NULL, "|");
+    }
+    printf(" (%d)\n", i);
+      //printf("%s\n", commands[i]);
+
+  }
+
+  /*
+  token = strtok(raw, ";");
+  while(token != NULL && n+1<UCHAR_MAX) {
+    commands[n++] = token;
+    pipes = strtok(token, "|");
+    while (pipes != NULL && i+1<UCHAR_MAX) {
+      jobs[i++] = pipes;
+      split = strtok(pipes, " ");
+      while (split != NULL && j+1<UCHAR_MAX) {
+        procs[j++] = split;
+        printf("%s ", split);
+        split = strtok(NULL, " ");
+      }
+      pipes = strtok(NULL, "|");
+    }
+    token = strtok(NULL, ";");
+  }
+  */
+  printf("%d\n", n);
+
   if(strcmp(raw,"exit")==0) {
     return -1;
   } else {
@@ -88,23 +160,29 @@ int parseCmd(char raw[]) {
 
 /* TODO : move to input */
 
+#define VK_ESCP 27
+#define VK_ESC2 91
+#define VK_BKSP 127
+
 /*
  * KEYS
  *
  * 9          : TAB
- * 27 91 65   : up
+ * 27 91 65   : up   (27 91 49 51 65   : alt up)
  * 27 91 66   : down
  * 27 91 67   : ->
  * 27 91 68   : <-
  * 27         : echap
  * 59         : ;
  * 32         : space
+ * 127        : suppr <==]
+ * 126        : suppr [==>
  */
 
 char * getPrevious() {
   char p[1024];
   int sz;
-  printf("\33[2K\r%s exit", ps1);
+  printf("\33[2K\r%sexit", ps1);
   sz = sprintf(p, "exit");
   return p;
 }
@@ -117,24 +195,31 @@ int readInput() {
   int cflag = 0;
 	//while((rc = read(0, &buffer, 1)) && i++<UCHAR_MAX-1 && buffer != '\n') {
 	while((buffer = getchar()) && i++<UCHAR_MAX-1 && buffer != '\n') {
-    if(cflag == 2) {
-      char *c = getPrevious();
-      for (i = 0; i < strlen(c); i++) input[i] = c[i];
-      input[i] = '\0';
-      cflag = -1;
-    }
-    if(cflag == 1) {
-      if(buffer == 91) cflag = 2;
-      else cflag = 0;
-    } else if (cflag == 0){
-      if(buffer == 27) cflag = 1;
-      else input[i] = buffer;
+    //printf("%d\n", buffer);
+    if(buffer == VK_BKSP) {
+      input[--i] = '\0';
+      i--;
+      printf("\33[2K\r%s%s", ps1, input);
     } else {
-
+      if(cflag == 2) {
+        char *c = getPrevious();
+        for (i = 0; i < strlen(c); i++) input[i] = c[i];
+        input[i] = '\0';
+        cflag = -1;
+      }
+      if(cflag == 1) {
+        if(buffer == VK_ESC2) cflag = 2;
+        else cflag = 0;
+      } else if (cflag == 0){
+        if(buffer == VK_ESCP) cflag = 1;
+        else input[i] = buffer;
+      } else {
+        cflag = 0;
+      }
     }
 	}
 	input[i] = '\0';
-  printf("%s\n", input);
+  //printf("%s\n", input);
   return parseCmd(input);
 
 	//return i;
