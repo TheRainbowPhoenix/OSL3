@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include "structs.h"
 
 extern char **environ;
@@ -147,7 +148,11 @@ int exec_main(int argc, char *argv[]) {
 
   printf("%s\n", _getENV("HOME"));
 
-  run(exe4, envp);
+  _readf(exe4[0]);
+  pid_t pid;
+  if((pid=fork()) == -1) trace("fork()","Fork error");
+  if(pid==0) run(exe4, envp);
+  else wait(NULL);
   //exec(exe[0], exe, envp);
   return 0;
 }

@@ -64,7 +64,10 @@ void runJob(job *j, int fg, int *id) {
     }
   }
   if(j->outfile) {
-    j->out = open(j->outfile, O_RDWR|O_CREAT|O_TRUNC, 0666);
+
+    //if((j->wmode&2)==2) lseek(j->out, 0, SEEK_SET);
+    if((j->wmode&2)==2) j->out = open(j->outfile, O_CREAT|O_RDWR|O_APPEND, 0666);
+    else j->out = open(j->outfile, O_CREAT|O_RDWR|O_TRUNC, 0666);
     if(j->out < 0) {
       trace(j->outfile,"open error");
     }
@@ -112,6 +115,7 @@ void runJob(job *j, int fg, int *id) {
   }
 }
 
+/* TEST AREA */
 
 int eval_main(int argc, char *argv[]) {
   printf("[47m[90m EVAL MAIN TEST [37m[49m\n");
@@ -165,6 +169,18 @@ int eval_main(int argc, char *argv[]) {
   j4->infile = "in";
   j4->outfile = "out";
   runJob(j4, 1, &id);
+
+  job *j5 = makeJob(NULL, P2, pgid, 0, _tmodes, 0, 1, 2);
+  j5->outfile = "f1.txt";
+  j5->wmode = 2;
+  runJob(j5, 1, &id);
+
+  job *j6 = makeJob(NULL, p2, pgid, 0, _tmodes, 0, 1, 2);
+  j6->outfile = "f1.txt";
+  j6->wmode = 2;
+  runJob(j6, 1, &id);
+
+  _readf("f1.txt");
   //runCmd(p, pgid, 0, 1, 2, 1);
   //printf("> should write ls output :\n");
   //wait(NULL);

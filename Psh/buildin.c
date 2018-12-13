@@ -37,6 +37,48 @@ int isBuiltin(process *p) {
  	return 1;
  }
 
+/*
+ * Some tools
+ */
+
+ void _readf(char *fname) {
+   printf("[100m[97m [4m %s [0m[100m[97m [0m[2m[48;5;235m\n", fname);
+   int c;
+   int l = 1;
+   int willN = 0;
+   FILE *file;
+   file = fopen(fname, "r");
+   if (file) {
+     printf("[0m[100m[37m");
+     printf("   %d",l);
+     printf("[37m[49m");//end block
+     printf("[0m[2m[48;5;235m ");
+     while ((c = getc(file)) != EOF)
+     if(c=='\n') willN = 1;
+     else {
+       if(willN) {
+         printf("\n");
+         printf("[0m[100m[37m");//begin block
+         l++;
+         if (l>999) printf("%d",l);
+         else if (l>99) printf(" %d",l);
+         else if (l>9) printf("  %d",l);
+         else printf("   %d",l);
+         printf("[37m[49m");//end block
+         printf("[2m[48;5;235m ");
+         willN = 0;
+       }
+       putchar(c);
+     }
+     fclose(file);
+   }
+   printf("[0m\n");
+ }
+
+/*
+ * TEST UNIT ?!
+ */
+
 int builtin_main(int argc, char *argv[]) {
   printf("[47m[90m BUILTIN MAIN TEST [37m[49m\n");
   char cwd[256];

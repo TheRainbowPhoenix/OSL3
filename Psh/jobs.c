@@ -73,6 +73,7 @@ job* makeEmptyJob() {
   j->out = STDOUT_FILENO;
   j->err = STDERR_FILENO;
   j->fg = 1;
+  j->wmode = 0;
   j->stopping = 0;
   j->pgid = 0;
   return j;
@@ -92,6 +93,7 @@ job * makeJob(job *next, process *p, pid_t pgid, char s, struct termios tm, int 
   j->in = in;
   j->out = out;
   j->err = err;
+  j->wmode = 0;
   return j;
 }
 

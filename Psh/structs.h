@@ -18,6 +18,7 @@ void run(char **argv, char **envp);
 static void exec(char *, char **, char **);
 int notBuiltIn(char **);
 char ** environment();
+void _readf(char *fname);
 
 typedef struct process
 {
@@ -43,6 +44,7 @@ typedef struct job
   char* infile;
   char * outfile;
   int in, out, err;
+  int wmode; //00 direct -- X1 seek in -- 1X seek out
   int fg;
 } job;
 

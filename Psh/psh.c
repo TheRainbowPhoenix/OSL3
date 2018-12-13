@@ -13,10 +13,13 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<sys/wait.h>
+#include <termios.h>
 
 job *head = NULL;
 
 char * builtin[UCHAR_MAX] = { "cd", "env", "end", "eval", "exit", "help","jobs", "tg", "wait" };
+char * ps1 = "$ ";
+char * ps2 = "> ";
 
 typedef struct fdef {
   int fd;
@@ -25,14 +28,32 @@ typedef struct fdef {
 
 fdef *checkOut(char**);
 
+void stdin_set(int cmd) {
+    struct termios t;
+    tcgetattr(1,&t);
+    switch (cmd) {
+      case 1: t.c_lflag &= ~ICANON; break;
+      default: t.c_lflag |= ICANON; break;
+    }
+    tcsetattr(1,0,&t);
+}
+
 void init() {
   ENV = environment();
+  stdin_set(1);
+  /* TODO : get from config file */
+  // READ ("/etc/profile");
+  // READ (".profile");
+
+  ps1 = "[90m>[37m[m ";
 
   _term = STDIN_FILENO;
   _itty = isatty(_term);
 
   if(_itty) {
     while(tcgetpgrp(_term) != (_pgid = getpgrp())) kill(-_pgid, SIGTTIN); // Grab the focus
+
+    /* TRAP */
 
     signal (SIGINT, SIG_IGN);
     signal (SIGQUIT, SIG_IGN);
@@ -54,6 +75,84 @@ int notBuiltIn(char **argv) {
 	if(strcmp(argv[0], "exit") == 0) return -1;
 	return 1;
 }
+
+/* TODO: move to parsers */
+
+int parseCmd(char raw[]) {
+  if(strcmp(raw,"exit")==0) {
+    return -1;
+  } else {
+    return 0;
+  }
+}
+
+/* TODO : move to input */
+
+/*
+ * KEYS
+ *
+ * 9          : TAB
+ * 27 91 65   : up
+ * 27 91 66   : down
+ * 27 91 67   : ->
+ * 27 91 68   : <-
+ * 27         : echap
+ * 59         : ;
+ * 32         : space
+ */
+
+char * getPrevious() {
+  char p[1024];
+  int sz;
+  printf("\33[2K\r%s exit", ps1);
+  sz = sprintf(p, "exit");
+  return p;
+}
+
+int readInput() {
+	int rc;
+	char buffer;
+	int i = -1;
+	char input[1024]; //TODO : free !
+  int cflag = 0;
+	//while((rc = read(0, &buffer, 1)) && i++<UCHAR_MAX-1 && buffer != '\n') {
+	while((buffer = getchar()) && i++<UCHAR_MAX-1 && buffer != '\n') {
+    if(cflag == 2) {
+      char *c = getPrevious();
+      for (i = 0; i < strlen(c); i++) input[i] = c[i];
+      input[i] = '\0';
+      cflag = -1;
+    }
+    if(cflag == 1) {
+      if(buffer == 91) cflag = 2;
+      else cflag = 0;
+    } else if (cflag == 0){
+      if(buffer == 27) cflag = 1;
+      else input[i] = buffer;
+    } else {
+
+    }
+	}
+	input[i] = '\0';
+  printf("%s\n", input);
+  return parseCmd(input);
+
+	//return i;
+}
+
+void loop(int r) {
+  int i;
+  size_t len;
+  char * line;
+  while (r) {
+    putstr(ps1);
+    i = readInput();
+		if(i<0) r=0;
+  }
+}
+
+
+/* STUFF */
 
 fdef *checkOut(char** elems) {
   int i = 0;
@@ -146,14 +245,17 @@ int shellexec(char **elems) {
 }
 
 int main(int argc, char *argv[]) {
-  /* TODO : code */
+  int run = 1;
+
   init();
+
+  loop(run);
+  /* remove this later */
 
   char *line = (char*)malloc(sizeof(char)*1024);
   char **elems =(char **)malloc(sizeof(char*)*64);
-  int run = 0;
-  while(run) {
-    printf(">");
+  while(0) {
+    printf("%s",ps1);
     readline(line);
     parseline(line, elems);
     if(elems[0]==NULL) {
