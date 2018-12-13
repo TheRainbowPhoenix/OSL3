@@ -95,6 +95,7 @@ job * makeJob(job *next, process *p, pid_t pgid, char s, struct termios tm, int 
   j->out = out;
   j->err = err;
   j->wmode = 0;
+  j->fg = 1;
   return j;
 }
 
@@ -164,6 +165,7 @@ int addJob(pid_t pgid, process * p) {
     j->in = 0;
     j->out = 1;
     j->err = 2;
+    j->fg = 1;
     head = j;
     return 1;
   } else {
@@ -181,6 +183,7 @@ int addJob(pid_t pgid, process * p) {
         jn->out = 1;
         jn->err = 2;
         j->next = jn;
+        j->fg = 1;
         return i+1;
       }
     }

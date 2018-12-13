@@ -92,7 +92,7 @@ void runJob(job *j, int fg, int *id) {
     } else {
       pid = fork();
       if(pid==0) {
-        runCmd(p, j->pgid, _in, _out, j->err, fg);
+        runCmd(p, j->pgid, _in, _out, j->err, j->fg);
       } else if(pid<0) {
         trace("eval.c:64 : fork()", "fork failed");
       } else {
@@ -153,10 +153,14 @@ int eval_main(int argc, char *argv[]) {
   process *Pe = makeProcess(Pe2, exee, 10, 0, 0, 0);
 
   pid_t pgid = getpid();
+  int id = 1;
+
+  job *jO = makeJob(NULL, p, pgid, 0, _tmodes, 0, 1, 2);
+  //runJob(jO, 1, &id);
+
   job *j = makeJob(NULL, p2, pgid, 0, _tmodes, 0, 1, 2);
   //echo OWO world yay | cut -b-4 | tr 'W' 'w' | awk '{print $1" what is this"}' | sed 's/this/dis/g' | xargs -I {} echo {} "?"
 //  printf("> should write 'OWO' :\n");
-  int id = 1;
   runJob(j, 1, &id);
 
   job *j2 = makeJob(NULL, P2, pgid, 0, _tmodes, 0, 1, 2);
@@ -193,6 +197,7 @@ int eval_main(int argc, char *argv[]) {
   job *jp = j;
   jp->outfile = "f1.txt";
   jp->wmode = 2;
+  jp->fg = 0;
   runJob(jp, 0, &id);
 
 

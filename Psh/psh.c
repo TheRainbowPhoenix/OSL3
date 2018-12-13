@@ -100,37 +100,74 @@ int notBuiltIn(char **argv) {
 
 process * parseProcess(char *args, int *fg) {
   process *p;
-  char ** exe = (char *[]){"ls", "-la", NULL};
+  //char ** exe;
+  char *cmd[UCHAR_MAX];
+  //char *a[UCHAR_MAX] = {};
   char buff[UCHAR_MAX];
+  char *c;
+  char *pos = args;
 
-  printf("%s\n", args);
+  //int i = 0;
+  int sz = 0;
+
+  p = makeEmptyProcess();
+
+  while(*pos++ != '\0') if(*pos == ' ') sz++;
+  p->argv = (char**)malloc((sz + 1) * sizeof(char*));
+
+  //p->argv = malloc((UCHAR_MAX)*sizeof(char*));
+  //char **cmd = p->argv;
+
+  p->argv[0] = args;
   int i = 0;
+  char* hit = args;
+  while((hit = strchr(hit, ' ')) != NULL) {
+    *hit++ = '\0';
+    p->argv[i++] = hit;
+  }
+
+
+  return p;
+
+  /*cmd[j] = strtok(args," ");
+
+  while(cmd[j]!=NULL)
+  {
+    printf("%s\n", cmd[j]);
+     cmd[++j] = strtok(NULL," ");
+  }*/
+  //cmd[j] = '\0';
+
+  /*int i = 0;
   int j = 0;
   int flg = 0;
   while (*args != '\0' && i<UCHAR_MAX) {
-    buff[i] = *args;
-    /*switch (*args) {
+    //buff[i] = *args;
+    switch (*args) {
       case '&': fg = 0; break;
       case ' ': while(*args==' ' && *args) args++;
         buff[i] = '\0';
-        exe[j] = buff;
         printf("%s\n", buff);
+        cmd[j] = buff;
+        //exe = realloc(exe, j+2 * sizeof(char *));
+        //exe[j] = calloc(1, i+1 );
+        //memcpy(exe[j], buff, i+1);
         i = 0;
         j++;
         break;
       default: buff[i] = *args;
-    }*/
+    }
     args++;
     i++;
-  }
-  buff[i] = '\0';
-  printf("b: %s\n", buff);
-  exe[j] = calloc(1, i+1 );
-  memcpy(exe[j], buff, i+1);
-
-  p = makeProcess(NULL, exe, 10, 0, 0, 0);
-  //p->argv = exe;
-  return p;
+  }*/
+  /*exe = malloc(j*sizeof(char *));
+  for (int n = 0; n <= j; n++) {
+    exe[n] = cmd[n];
+  }*/
+  //buff[i] = '\0';
+  //printf("b: %s\n", buff);
+  //exe[j] = calloc(1, i+1 );
+  //memcpy(exe[j], buff, i+1);
 }
 
 int parseCmd(char raw[]) {
@@ -145,10 +182,12 @@ int parseCmd(char raw[]) {
   char * jobs[UCHAR_MAX];
   char * procs[UCHAR_MAX];
 
+  pid_t pgid = getpid();
   job * jb;
   process *p = NULL;
   process *op = NULL;
   char** exe;
+  int id = 1;
   //token = strtok(raw, ";");
 
   token = strtok(raw, ";");
@@ -174,16 +213,20 @@ int parseCmd(char raw[]) {
       if(p!=NULL) op = p;
       p = parseProcess(pipes, &jb->fg);
       if(jb->head==NULL) jb->head = p;
-      if(op != NULL) p->next = op;
+      if(op != NULL) op->next = p;
 
       //printf("%s |", pipes);
       pipes = strtok(NULL, "|");
     }
+    //printf("%s\n", jb->head->argv[0]);
+    runJob(jb, jb->fg, &id);
+
     if(op != NULL) op=NULL;
     if(p != NULL) p=NULL;
     if(jb != NULL) jb=NULL;
     if(i > 0)  printf(" (%d)\n", i);
       //printf("%s\n", commands[i]);
+
 
   }
 
@@ -205,7 +248,7 @@ int parseCmd(char raw[]) {
     token = strtok(NULL, ";");
   }
   */
-  printf("%d\n", n);
+  //printf("%d\n", n);
 
   if(strcmp(raw,"exit")==0) {
     return -1;

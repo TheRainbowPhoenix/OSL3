@@ -31,6 +31,7 @@ typedef struct process
 } process;
 
 process * makeProcess(process * next, char **argv, pid_t pid, char c, char s, char st);
+process * makeEmptyProcess();
 
 typedef struct job
 {
@@ -52,6 +53,7 @@ int addJob(pid_t pgid, process * p);
 job* makeEmptyJob();
 job * makeJob(job *next, process *p, pid_t pgid, char s, struct termios tm, int in ,int out, int err);
 void runBuiltin(process *p, int _in, int _out, int _err);
+void runJob(job *j, int fg, int *id);
 void waitJob(job *j);
 void dumpJob(job *j);
 void jobFg(job *j, int cnt);
