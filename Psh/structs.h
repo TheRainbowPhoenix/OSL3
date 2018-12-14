@@ -69,6 +69,18 @@ struct termios _tmodes;
 int _term;
 int _itty;
 
+char * ps1; // prompt
+char * ps2; // prompt
+char * prev; //POOR HISTORY
+
+/* PARSER NOT WORKING ATM */
+process * parseProcess(char *args, job **j);
+int parseCmd(char raw[]);
+char * getPrevious();
+int readInput();
+
+/* ENDS HERE */
+
 int isBuiltin(process *p);
 int changeDir(char * path);
 char * _getENV(char *var);
