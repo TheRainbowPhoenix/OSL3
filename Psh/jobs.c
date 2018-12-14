@@ -191,6 +191,16 @@ int addJob(pid_t pgid, process * p) {
   return 0;
 }
 
+void waitfor(pid_t pid) {
+  int status;
+  tcsetpgrp(_term, pid);
+  waitpid(pid, &status, WUNTRACED);
+  if(WIFSTOPPED(status)) {
+    // stuff
+  }
+  tcsetpgrp(_term, getpid());
+}
+
 void printJob(job *j) {
   printf("[%d] (%d %d:%d:%d)\n", j->pgid, j->stopping, j->in , j->out , j->err);
 }
