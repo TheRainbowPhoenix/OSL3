@@ -23,6 +23,8 @@ char * builtin[UCHAR_MAX] = { "cd", "env", "end", "eval", "exit", "help","jobs",
 char * ps1 = "$ ";
 char * ps2 = "> ";
 
+char * prev = "exit";
+
 typedef struct fdef {
   int fd;
   int fw;
@@ -98,7 +100,7 @@ int notBuiltIn(char **argv) {
 //   p0    |   p1       +> f
 //   p0
 
-process * parseProcess(char *args, int *fg) {
+process * parseProcess(char *args, job **j) {
   process *p;
   //char ** exe;
   char *cmd[UCHAR_MAX];
@@ -106,6 +108,8 @@ process * parseProcess(char *args, int *fg) {
   char buff[UCHAR_MAX];
   char *c;
   char *pos = args;
+
+  //prev = args;
 
   //int i = 0;
   int sz = 0;
@@ -119,9 +123,11 @@ process * parseProcess(char *args, int *fg) {
   //char **cmd = p->argv;
 
   p->argv[0] = args;
-  int i = 0;
+  int i = 1;
   char* hit = args;
+  
   while((hit = strchr(hit, ' ')) != NULL) {
+    //while(*hit==' ' && *hit) hit++;
     *hit++ = '\0';
     p->argv[i++] = hit;
   }
@@ -182,6 +188,9 @@ int parseCmd(char raw[]) {
   char * jobs[UCHAR_MAX];
   char * procs[UCHAR_MAX];
 
+  prev = raw;
+  strcpy(prev, raw);
+
   pid_t pgid = getpid();
   job * jb;
   process *p = NULL;
@@ -203,7 +212,7 @@ int parseCmd(char raw[]) {
     jb = makeEmptyJob();
 
     pipes = strtok(commands[n], "|");
-    printf("%d ", n);
+    //printf("%d ", n);
     i = -1;
     while(pipes != NULL && i+1<UCHAR_MAX) {
       while(*pipes==' ') pipes++;
@@ -211,7 +220,7 @@ int parseCmd(char raw[]) {
       jobs[++i] = pipes;
 
       if(p!=NULL) op = p;
-      p = parseProcess(pipes, &jb->fg);
+      p = parseProcess(pipes, &jb);
       if(jb->head==NULL) jb->head = p;
       if(op != NULL) op->next = p;
 
@@ -219,12 +228,13 @@ int parseCmd(char raw[]) {
       pipes = strtok(NULL, "|");
     }
     //printf("%s\n", jb->head->argv[0]);
+
     runJob(jb, jb->fg, &id);
 
     if(op != NULL) op=NULL;
     if(p != NULL) p=NULL;
     if(jb != NULL) jb=NULL;
-    if(i > 0)  printf(" (%d)\n", i);
+    //if(i > 0)  printf(" (%d)\n", i);
       //printf("%s\n", commands[i]);
 
 
@@ -279,10 +289,10 @@ int parseCmd(char raw[]) {
  */
 
 char * getPrevious() {
-  char *p = calloc(1, 6); //strlen(exit)+1
+  char *p = calloc(1, strlen(prev)+1); //strlen(exit)+1
   int sz;
-  printf("\33[2K\r%sexit", ps1);
-  sz = sprintf(p, "exit");
+  printf("\33[2K\r%s%s", ps1, prev);
+  sz = sprintf(p, "%s", prev);
   return p;
 }
 
