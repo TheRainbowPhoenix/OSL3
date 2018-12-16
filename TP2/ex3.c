@@ -39,14 +39,14 @@ int main(int argc, char ** argv) {
 		return 1;
 	}
 
-	int t = ft_atoi(argv[2]);
-	
-	pid = fork();
-	
-	char ** cmd = &argv[2];	
+	int t = ft_atoi(argv[1]);
 
-	signal(SIGALRM, killit);  
-	
+	pid = fork();
+
+	char ** cmd = &argv[2];
+
+	signal(SIGALRM, killit);
+
 	if (pid == -1)
 		perror("fork error");
 	else if (pid == 0) {

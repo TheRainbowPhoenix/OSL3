@@ -661,10 +661,6 @@ int tg(char **args) {
   } else {
     putErr("Module not found. Try --list to display them.");
   }
-  /*int SHOW_CWD = 1;
-  int SHOW_NAME = 1;
-  int SHOW_GIT = 0;
-  */
   return 0;
 }
 
